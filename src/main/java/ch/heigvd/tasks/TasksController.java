@@ -15,10 +15,10 @@ public class TasksController {
 
     private final AtomicInteger uniqueId = new AtomicInteger(1);
 
-    public TasksController(ConcurrentMap<Integer, Task> lists) {
-        this.tasks = lists;
+    public TasksController(ConcurrentMap<Integer, Task> tasks) {
+        this.tasks = tasks;
     }
-    
+
     public void create(Context ctx) {
         Task newTask =
                 ctx.bodyValidator(Task.class)
@@ -86,8 +86,8 @@ public class TasksController {
 
         Task updateTask =
                 ctx.bodyValidator(Task.class)
-                        .check(obj -> obj.description() != null, "Missing description")
-                        .check(obj -> obj.dueDate() != null, "Missing due date")
+                        .check(obj -> !tasks.get(id).description().equals(obj.description()) && obj.description() != null, "Missing description")
+                        .check(obj -> !tasks.get(id).dueDate().equals(obj.dueDate()) &&  obj.dueDate() != null, "Missing due date")
                         .get();
 
         tasks.put(id, updateTask);
