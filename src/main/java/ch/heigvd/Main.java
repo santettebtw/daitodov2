@@ -30,7 +30,18 @@ public class Main {
     TaskListsController taskListsController = new TaskListsController(taskLists, nextTaskListId);
 
     Javalin app = Javalin.create();
+
+    app.get("/tasks", tasksController::getAll);
+    app.get("/tasks/{id}", tasksController::getOne);
     app.post("/tasks", tasksController::create);
+    app.put("/tasks", tasksController::update);
+    app.delete("/tasks/{id}", tasksController::delete);
+
+    app.get("/tasklists", taskListsController::getAll);
+    app.get("/tasklists/{id}", taskListsController::getOne);
+    app.post("/tasklists", taskListsController::create);
+    app.put("/tasklists/{id}", taskListsController::update);
+    app.delete("/tasklists/{id}", taskListsController::delete);
 
     // https://docs.oracle.com/javase/8/docs/technotes/guides/lang/hook-design.html
     Runtime.getRuntime()
