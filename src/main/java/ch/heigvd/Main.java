@@ -1,9 +1,9 @@
 package ch.heigvd;
 
-import ch.heigvd.tasklists.TaskList;
-import ch.heigvd.tasklists.TaskListsController;
 import ch.heigvd.persistence.ApplicationData;
 import ch.heigvd.persistence.PersistenceService;
+import ch.heigvd.tasklists.TaskList;
+import ch.heigvd.tasklists.TaskListsController;
 import ch.heigvd.tasks.Task;
 import ch.heigvd.tasks.TasksController;
 import io.javalin.Javalin;
@@ -17,25 +17,30 @@ public class Main {
   public static void main(String[] args) {
     PersistenceService persistence = new PersistenceService();
     ApplicationData data = persistence.load();
-    
+
     ConcurrentMap<Integer, Task> tasks = new ConcurrentHashMap<>(data.tasks());
     ConcurrentMap<Integer, TaskList> taskLists = new ConcurrentHashMap<>(data.taskLists());
-    
-    AtomicInteger nextTaskId = new AtomicInteger(tasks.keySet().stream().mapToInt(i -> i).max().orElse(0) + 1);
-    AtomicInteger nextTaskListId = new AtomicInteger(taskLists.keySet().stream().mapToInt(i -> i).max().orElse(0) + 1);
-    
+
+    AtomicInteger nextTaskId =
+        new AtomicInteger(tasks.keySet().stream().mapToInt(i -> i).max().orElse(0) + 1);
+    AtomicInteger nextTaskListId =
+        new AtomicInteger(taskLists.keySet().stream().mapToInt(i -> i).max().orElse(0) + 1);
+
     TasksController tasksController = new TasksController(tasks, nextTaskId);
     TaskListsController taskListsController = new TaskListsController(taskLists, nextTaskListId);
-    
+
     Javalin app = Javalin.create();
     app.post("/tasks", tasksController::create);
-    
+
     // https://docs.oracle.com/javase/8/docs/technotes/guides/lang/hook-design.html
-    Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-      System.out.println("Saving data...");
-      persistence.save(new ApplicationData(tasks, taskLists));
-    }));
-    
+    Runtime.getRuntime()
+        .addShutdownHook(
+            new Thread(
+                () -> {
+                  System.out.println("Saving data...");
+                  persistence.save(new ApplicationData(tasks, taskLists));
+                }));
+
     app.start(PORT);
   }
 }

@@ -19,7 +19,7 @@ public class PersistenceService {
 
   public PersistenceService() {
     this.objectMapper = new ObjectMapper();
-	// add time parsing modile (like with javalin)
+    // add time parsing modile (like with javalin)
     this.objectMapper.registerModule(new JavaTimeModule());
     this.dataFilePath = Paths.get(DATA_FILE);
   }
@@ -45,4 +45,3 @@ public class PersistenceService {
     }
   }
 }
-

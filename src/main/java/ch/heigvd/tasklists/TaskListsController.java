@@ -17,15 +17,9 @@ public class TaskListsController {
 
   public void create(Context ctx) {
     TaskList newTaskList =
-        ctx.bodyValidator(TaskList.class)
-            .check(obj -> obj.name() != null, "Missing name")
-            .get();
+        ctx.bodyValidator(TaskList.class).check(obj -> obj.name() != null, "Missing name").get();
 
-    newTaskList =
-        new TaskList(
-            uniqueId.getAndIncrement(),
-            newTaskList.name(),
-            newTaskList.tasks());
+    newTaskList = new TaskList(uniqueId.getAndIncrement(), newTaskList.name(), newTaskList.tasks());
 
     lists.put(newTaskList.id(), newTaskList);
 
@@ -73,9 +67,7 @@ public class TaskListsController {
     }
 
     TaskList updateTaskList =
-        ctx.bodyValidator(TaskList.class)
-            .check(obj -> obj.name() != null, "Missing name")
-            .get();
+        ctx.bodyValidator(TaskList.class).check(obj -> obj.name() != null, "Missing name").get();
 
     lists.put(id, updateTaskList);
 

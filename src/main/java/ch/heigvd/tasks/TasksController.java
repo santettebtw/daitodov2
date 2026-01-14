@@ -3,7 +3,6 @@ package ch.heigvd.tasks;
 import io.javalin.http.Context;
 import io.javalin.http.HttpStatus;
 import io.javalin.http.NotFoundResponse;
-
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -11,99 +10,105 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class TasksController {
-    private final ConcurrentMap<Integer, Task> tasks;
-    private final AtomicInteger nextTaskId;
+  private final ConcurrentMap<Integer, Task> tasks;
+  private final AtomicInteger nextTaskId;
 
-	public TasksController(ConcurrentMap<Integer, Task> tasks, AtomicInteger nextTaskId) {
-        this.tasks = tasks;
-		this.nextTaskId = nextTaskId;
+  public TasksController(ConcurrentMap<Integer, Task> tasks, AtomicInteger nextTaskId) {
+    this.tasks = tasks;
+    this.nextTaskId = nextTaskId;
+  }
+
+  public void create(Context ctx) {
+    Task newTask =
+        ctx.bodyValidator(Task.class)
+            .check(obj -> obj.description() != null, "Missing description")
+            .check(obj -> obj.dueDate() != null, "Missing due date")
+            .get();
+
+    newTask =
+        new Task(
+            nextTaskId.getAndIncrement(),
+            newTask.description(),
+            LocalDate.now(),
+            newTask.dueDate(),
+            newTask.priority(),
+            newTask.status());
+
+    tasks.put(newTask.id(), newTask);
+
+    ctx.status(HttpStatus.CREATED);
+    ctx.json(newTask);
+  }
+
+  public void getOne(Context ctx) {
+    Integer id = ctx.pathParamAsClass("id", Integer.class).get();
+
+    Task task = tasks.get(id);
+
+    if (task == null) {
+      throw new NotFoundResponse();
     }
 
-    public void create(Context ctx) {
-        Task newTask =
-                ctx.bodyValidator(Task.class)
-                        .check(obj -> obj.description() != null, "Missing description")
-                        .check(obj -> obj.dueDate() != null, "Missing due date")
-                        .get();
+    ctx.json(task);
+  }
 
-        newTask =
-                new Task(
-                        nextTaskId.getAndIncrement(),
-                        newTask.description(),
-                        LocalDate.now(),
-                        newTask.dueDate(),
-                        newTask.priority(),
-                        newTask.status());
+  public void getMany(Context ctx) {
+    String dueDate = ctx.queryParam("dueDate");
+    Task.Status status = Task.Status.valueOf(ctx.queryParam("status"));
+    Task.Priority priority = Task.Priority.valueOf(ctx.queryParam("priority"));
 
-        tasks.put(newTask.id(), newTask);
+    List<Task> tasks = new ArrayList<>();
 
-        ctx.status(HttpStatus.CREATED);
-        ctx.json(newTask);
+    for (Task task : this.tasks.values()) {
+      if (task.dueDate().toString().equals(dueDate)) {
+        tasks.add(task);
+      } else if (task.status().equals(status)) {
+        tasks.add(task);
+      } else if (task.priority().equals(priority)) {
+        tasks.add(task);
+      }
     }
 
-    public void getOne(Context ctx) {
-        Integer id = ctx.pathParamAsClass("id", Integer.class).get();
+    ctx.json(tasks);
+  }
 
-        Task task = tasks.get(id);
+  public void getAll(Context ctx) {
+    ctx.json(tasks);
+  }
 
-        if (task == null) {
-            throw new NotFoundResponse();
-        }
+  public void update(Context ctx) {
+    Integer id = ctx.pathParamAsClass("id", Integer.class).get();
 
-        ctx.json(task);
+    if (!tasks.containsKey(id)) {
+      throw new NotFoundResponse();
     }
 
-    public void getMany(Context ctx) {
-        String dueDate = ctx.queryParam("dueDate");
-        Task.Status status = Task.Status.valueOf(ctx.queryParam("status"));
-        Task.Priority priority = Task.Priority.valueOf(ctx.queryParam("priority"));
+    Task updateTask =
+        ctx.bodyValidator(Task.class)
+            .check(
+                obj ->
+                    !tasks.get(id).description().equals(obj.description())
+                        && obj.description() != null,
+                "Missing description")
+            .check(
+                obj -> !tasks.get(id).dueDate().equals(obj.dueDate()) && obj.dueDate() != null,
+                "Missing due date")
+            .get();
 
-        List<Task> tasks = new ArrayList<>();
+    tasks.put(id, updateTask);
 
-        for (Task task : this.tasks.values()) {
-            if (task.dueDate().toString().equals(dueDate)) {
-                tasks.add(task);
-            } else if (task.status().equals(status)){
-                tasks.add(task);
-            } else if (task.priority().equals(priority)) {
-                tasks.add(task);
-            }
-        }
+    ctx.json(updateTask);
+  }
 
-        ctx.json(tasks);
+  public void delete(Context ctx) {
+    Integer id = ctx.pathParamAsClass("id", Integer.class).get();
+
+    if (!tasks.containsKey(id)) {
+      throw new NotFoundResponse();
     }
 
-    public void getAll(Context ctx) {
-        ctx.json(tasks);
-    }
+    tasks.remove(id);
 
-    public void update(Context ctx) {
-        Integer id = ctx.pathParamAsClass("id", Integer.class).get();
-
-        if (!tasks.containsKey(id)) {
-            throw new NotFoundResponse();
-        }
-
-        Task updateTask =
-                ctx.bodyValidator(Task.class)
-                        .check(obj -> !tasks.get(id).description().equals(obj.description()) && obj.description() != null, "Missing description")
-                        .check(obj -> !tasks.get(id).dueDate().equals(obj.dueDate()) &&  obj.dueDate() != null, "Missing due date")
-                        .get();
-
-        tasks.put(id, updateTask);
-
-        ctx.json(updateTask);
-    }
-
-    public void delete(Context ctx) {
-        Integer id = ctx.pathParamAsClass("id", Integer.class).get();
-
-        if (!tasks.containsKey(id)) {
-            throw new NotFoundResponse();
-        }
-
-        tasks.remove(id);
-
-        ctx.status(HttpStatus.NO_CONTENT);
-    }
+    ctx.status(HttpStatus.NO_CONTENT);
+  }
 }
