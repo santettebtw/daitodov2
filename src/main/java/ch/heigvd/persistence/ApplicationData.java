@@ -1,7 +1,7 @@
 package ch.heigvd.persistence;
 
-import ch.heigvd.list.TaskList;
-import ch.heigvd.task.Task;
+import ch.heigvd.tasklists.TaskList;
+import ch.heigvd.tasks.Task;
 import java.util.Map;
 
 /** Data model to hold all application state for persistence. */
