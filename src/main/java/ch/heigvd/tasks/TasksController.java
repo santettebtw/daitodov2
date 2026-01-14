@@ -12,11 +12,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class TasksController {
     private final ConcurrentMap<Integer, Task> tasks;
+    private final AtomicInteger nextTaskId;
 
-    private final AtomicInteger uniqueId = new AtomicInteger(1);
-
-    public TasksController(ConcurrentMap<Integer, Task> tasks) {
+	public TasksController(ConcurrentMap<Integer, Task> tasks, AtomicInteger nextTaskId) {
         this.tasks = tasks;
+		this.nextTaskId = nextTaskId;
     }
 
     public void create(Context ctx) {
@@ -28,7 +28,7 @@ public class TasksController {
 
         newTask =
                 new Task(
-                        uniqueId.getAndIncrement(),
+                        nextTaskId.getAndIncrement(),
                         newTask.description(),
                         LocalDate.now(),
                         newTask.dueDate(),

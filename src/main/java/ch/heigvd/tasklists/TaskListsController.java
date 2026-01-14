@@ -1,4 +1,4 @@
-package ch.heigvd.lists;
+package ch.heigvd.tasklists;
 
 import io.javalin.http.*;
 import java.util.ArrayList;
@@ -8,11 +8,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class TaskListsController {
   private final ConcurrentMap<Integer, TaskList> lists;
+  private final AtomicInteger uniqueId;
 
-  private final AtomicInteger uniqueId = new AtomicInteger(1);
-
-  public TaskListsController(ConcurrentMap<Integer, TaskList> lists) {
+  public TaskListsController(ConcurrentMap<Integer, TaskList> lists, AtomicInteger uniqueId) {
     this.lists = lists;
+    this.uniqueId = uniqueId;
   }
 
   public void create(Context ctx) {

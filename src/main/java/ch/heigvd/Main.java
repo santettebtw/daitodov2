@@ -1,11 +1,11 @@
 package ch.heigvd;
 
-import ch.heigvd.list.TaskList;
-import ch.heigvd.list.TaskListsController;
+import ch.heigvd.tasklists.TaskList;
+import ch.heigvd.tasklists.TaskListsController;
 import ch.heigvd.persistence.ApplicationData;
 import ch.heigvd.persistence.PersistenceService;
-import ch.heigvd.task.Task;
-import ch.heigvd.task.TasksController;
+import ch.heigvd.tasks.Task;
+import ch.heigvd.tasks.TasksController;
 import io.javalin.Javalin;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
