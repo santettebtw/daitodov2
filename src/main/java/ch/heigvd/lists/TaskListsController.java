@@ -1,4 +1,4 @@
-package ch.heigvd.list;
+package ch.heigvd.lists;
 
 import io.javalin.http.*;
 import java.util.ArrayList;
