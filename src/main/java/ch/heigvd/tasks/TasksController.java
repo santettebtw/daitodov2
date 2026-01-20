@@ -1,9 +1,8 @@
 package ch.heigvd.tasks;
 
-import io.javalin.http.Context;
-import io.javalin.http.HttpStatus;
-import io.javalin.http.NotFoundResponse;
+import io.javalin.http.*;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentMap;
@@ -12,10 +11,19 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class TasksController {
   private final ConcurrentMap<Integer, Task> tasks;
   private final AtomicInteger nextTaskId;
+  private final ConcurrentMap<Integer, LocalDateTime> tasksCache;
 
-  public TasksController(ConcurrentMap<Integer, Task> tasks, AtomicInteger nextTaskId) {
+  // Magic number used to store the tasks list last modification date
+  // As the ID for tasks starts from 1, it is safe to reserve the value -1 for all tasks
+  private final Integer RESERVED_ID_TO_IDENTIFY_ALL_TASKS = -1;
+
+  public TasksController(
+      ConcurrentMap<Integer, Task> tasks,
+      AtomicInteger nextTaskId,
+      ConcurrentMap<Integer, LocalDateTime> tasksCache) {
     this.tasks = tasks;
     this.nextTaskId = nextTaskId;
+    this.tasksCache = tasksCache;
   }
 
   public void create(Context ctx) {
@@ -36,7 +44,15 @@ public class TasksController {
 
     tasks.put(newTask.id(), newTask);
 
+    LocalDateTime now = LocalDateTime.now();
+    tasksCache.put(newTask.id(), now);
+
+    tasksCache.remove(RESERVED_ID_TO_IDENTIFY_ALL_TASKS);
+
     ctx.status(HttpStatus.CREATED);
+
+    ctx.header("Last-Modified", String.valueOf(now));
+
     ctx.json(newTask);
   }
 
@@ -48,6 +64,25 @@ public class TasksController {
     if (task == null) {
       throw new NotFoundResponse();
     }
+
+    LocalDateTime lastKnownModification =
+        ctx.headerAsClass("If-Modified-Since", LocalDateTime.class).getOrDefault(null);
+
+    if (lastKnownModification != null
+        && tasksCache.containsKey(id)
+        && tasksCache.get(id).equals(lastKnownModification)) {
+      throw new NotModifiedResponse();
+    }
+
+    LocalDateTime now;
+    if (tasksCache.containsKey(task.id())) {
+      now = tasksCache.get(task.id());
+    } else {
+      now = LocalDateTime.now();
+      tasksCache.put(task.id(), now);
+    }
+
+    ctx.header("Last-Modified", String.valueOf(now));
 
     ctx.json(task);
   }
@@ -73,6 +108,25 @@ public class TasksController {
   }
 
   public void getAll(Context ctx) {
+    LocalDateTime lastKnownModification =
+        ctx.headerAsClass("If-Modified-Since", LocalDateTime.class).getOrDefault(null);
+
+    if (lastKnownModification != null
+        && tasksCache.containsKey(RESERVED_ID_TO_IDENTIFY_ALL_TASKS)
+        && tasksCache.get(RESERVED_ID_TO_IDENTIFY_ALL_TASKS).equals(lastKnownModification)) {
+      throw new NotModifiedResponse();
+    }
+
+    LocalDateTime now;
+    if (tasksCache.containsKey(RESERVED_ID_TO_IDENTIFY_ALL_TASKS)) {
+      now = tasksCache.get(RESERVED_ID_TO_IDENTIFY_ALL_TASKS);
+    } else {
+      now = LocalDateTime.now();
+      tasksCache.put(RESERVED_ID_TO_IDENTIFY_ALL_TASKS, now);
+    }
+
+    ctx.header("Last-Modified", String.valueOf(now));
+
     ctx.json(tasks);
   }
 
@@ -83,21 +137,41 @@ public class TasksController {
       throw new NotFoundResponse();
     }
 
+    LocalDateTime lastKnownModification =
+        ctx.headerAsClass("If-Unmodified-Since", LocalDateTime.class).getOrDefault(null);
+
+    if (lastKnownModification != null
+        && tasksCache.containsKey(id)
+        && !tasksCache.get(id).equals(lastKnownModification)) {
+      throw new PreconditionFailedResponse();
+    }
+
+    Task existingTask = tasks.get(id);
     Task updateTask =
         ctx.bodyValidator(Task.class)
-            .check(
-                obj ->
-                    !tasks.get(id).description().equals(obj.description())
-                        && obj.description() != null,
-                "Missing description")
-            .check(
-                obj -> !tasks.get(id).dueDate().equals(obj.dueDate()) && obj.dueDate() != null,
-                "Missing due date")
+            .check(obj -> obj.description() != null, "Missing description")
+            .check(obj -> obj.dueDate() != null, "Missing due date")
             .get();
 
-    tasks.put(id, updateTask);
+    Task updatedTask =
+        new Task(
+            existingTask.id(),
+            updateTask.description(),
+            existingTask.createdAt(),
+            updateTask.dueDate(),
+            updateTask.priority(),
+            updateTask.status());
 
-    ctx.json(updateTask);
+    tasks.put(id, updatedTask);
+
+    LocalDateTime now = LocalDateTime.now();
+    tasksCache.put(updatedTask.id(), now);
+
+    tasksCache.remove(RESERVED_ID_TO_IDENTIFY_ALL_TASKS);
+
+    ctx.header("Last-Modified", String.valueOf(now));
+
+    ctx.json(updatedTask);
   }
 
   public void delete(Context ctx) {
@@ -107,7 +181,20 @@ public class TasksController {
       throw new NotFoundResponse();
     }
 
+    LocalDateTime lastKnownModification =
+        ctx.headerAsClass("If-Unmodified-Since", LocalDateTime.class).getOrDefault(null);
+
+    if (lastKnownModification != null
+        && tasksCache.containsKey(id)
+        && !tasksCache.get(id).equals(lastKnownModification)) {
+      throw new PreconditionFailedResponse();
+    }
+
     tasks.remove(id);
+
+    tasksCache.remove(id);
+
+    tasksCache.remove(RESERVED_ID_TO_IDENTIFY_ALL_TASKS);
 
     ctx.status(HttpStatus.NO_CONTENT);
   }
