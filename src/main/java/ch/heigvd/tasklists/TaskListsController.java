@@ -1,6 +1,7 @@
 package ch.heigvd.tasklists;
 
 import io.javalin.http.*;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentMap;
@@ -9,10 +10,17 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class TaskListsController {
   private final ConcurrentMap<Integer, TaskList> lists;
   private final AtomicInteger uniqueId;
+  private final ConcurrentMap<Integer, LocalDateTime> taskListsCache;
 
-  public TaskListsController(ConcurrentMap<Integer, TaskList> lists, AtomicInteger uniqueId) {
+  private final Integer RESERVED_ID_TO_IDENTIFY_ALL_TASK_LISTS = -1;
+
+  public TaskListsController(
+      ConcurrentMap<Integer, TaskList> lists,
+      AtomicInteger uniqueId,
+      ConcurrentMap<Integer, LocalDateTime> taskListsCache) {
     this.lists = lists;
     this.uniqueId = uniqueId;
+    this.taskListsCache = taskListsCache;
   }
 
   public void create(Context ctx) {
@@ -23,7 +31,15 @@ public class TaskListsController {
 
     lists.put(newTaskList.id(), newTaskList);
 
+    LocalDateTime now = LocalDateTime.now();
+    taskListsCache.put(newTaskList.id(), now);
+
+    taskListsCache.remove(RESERVED_ID_TO_IDENTIFY_ALL_TASK_LISTS);
+
     ctx.status(HttpStatus.CREATED);
+
+    ctx.header("Last-Modified", String.valueOf(now));
+
     ctx.json(newTaskList);
   }
 
@@ -35,6 +51,25 @@ public class TaskListsController {
     if (list == null) {
       throw new NotFoundResponse();
     }
+
+    LocalDateTime lastKnownModification =
+        ctx.headerAsClass("If-Modified-Since", LocalDateTime.class).getOrDefault(null);
+
+    if (lastKnownModification != null
+        && taskListsCache.containsKey(id)
+        && taskListsCache.get(id).equals(lastKnownModification)) {
+      throw new NotModifiedResponse();
+    }
+
+    LocalDateTime now;
+    if (taskListsCache.containsKey(list.id())) {
+      now = taskListsCache.get(list.id());
+    } else {
+      now = LocalDateTime.now();
+      taskListsCache.put(list.id(), now);
+    }
+
+    ctx.header("Last-Modified", String.valueOf(now));
 
     ctx.json(list);
   }
@@ -56,6 +91,28 @@ public class TaskListsController {
   }
 
   public void getAll(Context ctx) {
+    LocalDateTime lastKnownModification =
+        ctx.headerAsClass("If-Modified-Since", LocalDateTime.class).getOrDefault(null);
+
+    if (lastKnownModification != null
+        && taskListsCache.containsKey(RESERVED_ID_TO_IDENTIFY_ALL_TASK_LISTS)
+        && taskListsCache
+            .get(RESERVED_ID_TO_IDENTIFY_ALL_TASK_LISTS)
+            .equals(lastKnownModification)) {
+      throw new NotModifiedResponse();
+    }
+
+    LocalDateTime now;
+    if (taskListsCache.containsKey(RESERVED_ID_TO_IDENTIFY_ALL_TASK_LISTS)) {
+      now = taskListsCache.get(RESERVED_ID_TO_IDENTIFY_ALL_TASK_LISTS);
+    } else {
+      now = LocalDateTime.now();
+      taskListsCache.put(RESERVED_ID_TO_IDENTIFY_ALL_TASK_LISTS, now);
+    }
+
+    // Add the last modification date to the response
+    ctx.header("Last-Modified", String.valueOf(now));
+
     ctx.json(lists);
   }
 
@@ -66,10 +123,26 @@ public class TaskListsController {
       throw new NotFoundResponse();
     }
 
+    LocalDateTime lastKnownModification =
+        ctx.headerAsClass("If-Unmodified-Since", LocalDateTime.class).getOrDefault(null);
+
+    if (lastKnownModification != null
+        && taskListsCache.containsKey(id)
+        && !taskListsCache.get(id).equals(lastKnownModification)) {
+      throw new PreconditionFailedResponse();
+    }
+
     TaskList updateTaskList =
         ctx.bodyValidator(TaskList.class).check(obj -> obj.name() != null, "Missing name").get();
 
     lists.put(id, updateTaskList);
+
+    LocalDateTime now = LocalDateTime.now();
+    taskListsCache.put(updateTaskList.id(), now);
+
+    taskListsCache.remove(RESERVED_ID_TO_IDENTIFY_ALL_TASK_LISTS);
+
+    ctx.header("Last-Modified", String.valueOf(now));
 
     ctx.json(updateTaskList);
   }
@@ -81,7 +154,20 @@ public class TaskListsController {
       throw new NotFoundResponse();
     }
 
+    LocalDateTime lastKnownModification =
+        ctx.headerAsClass("If-Unmodified-Since", LocalDateTime.class).getOrDefault(null);
+
+    if (lastKnownModification != null
+        && taskListsCache.containsKey(id)
+        && !taskListsCache.get(id).equals(lastKnownModification)) {
+      throw new PreconditionFailedResponse();
+    }
+
     lists.remove(id);
+
+    taskListsCache.remove(id);
+
+    taskListsCache.remove(RESERVED_ID_TO_IDENTIFY_ALL_TASK_LISTS);
 
     ctx.status(HttpStatus.NO_CONTENT);
   }
