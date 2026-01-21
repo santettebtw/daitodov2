@@ -1,0 +1,191 @@
+###### ====== PART 1: BASIC TASK CREATION ========
+
+
+### Create Task 1 - HIGH priority task -----------
+POST https://daitodo.duckdns.org/tasks
+Content-Type: application/json
+
+{
+  "description": "Research API best practices",
+  "dueDate": "2026-01-25",
+  "priority": "HIGH",
+  "status": "TODO"
+}
+### ----------------------------------------------
+
+
+### Create Task 2 - MEDIUM priority task ---------
+POST https://daitodo.duckdns.org/tasks
+Content-Type: application/json
+
+{
+  "description": "Implement REST endpoints",
+  "dueDate": "2026-01-26",
+  "priority": "MEDIUM",
+  "status": "DOING"
+}
+### ----------------------------------------------
+
+
+### Create Task 3 - LOW priority task ------------
+POST https://daitodo.duckdns.org/tasks
+Content-Type: application/json
+
+{
+  "description": "Write API documentation",
+  "dueDate": "2026-01-27",
+  "priority": "LOW",
+  "status": "TODO"
+}
+### ----------------------------------------------
+
+
+### Create Task 4 - Another HIGH priority task ---
+POST https://daitodo.duckdns.org/tasks
+Content-Type: application/json
+
+{
+  "description": "Deploy to production",
+  "dueDate": "2026-01-28",
+  "priority": "HIGH",
+  "status": "TODO"
+}
+### ----------------------------------------------
+
+
+###### ====== PART 2: QUERYING AND FILTERING =====
+
+
+### Get all tasks
+GET https://daitodo.duckdns.org/tasks
+
+### Filter by status - Show only TODO tasks
+GET https://daitodo.duckdns.org/tasks?status=TODO
+
+### Filter by priority - Show only HIGH priority tasks
+GET https://daitodo.duckdns.org/tasks?priority=HIGH
+
+### Multiple filters - HIGH priority TODO tasks
+GET https://daitodo.duckdns.org/tasks?status=TODO&prority=HIGH
+
+### Get a specific task by ID
+GET https://daitodo.duckdns.org/tasks/1
+
+
+###### ====== PART 3: TASK LISTS =================
+
+
+### Create a task list for urgent items -----------
+POST https://daitodo.duckdns.org/tasklists
+Content-Type: application/json
+
+{
+  "name": "Urgent Sprint Tasks",
+  "taskIds": [1, 4]
+}
+### -----------------------------------------------
+
+
+### Create another task list for development work -
+POST https://daitodo.duckdns.org/tasklists
+Content-Type: application/json
+
+{
+  "name": "Development Work",
+  "taskIds": [2, 3]
+}
+### -----------------------------------------------
+
+
+### Get all task lists ----------------------------
+GET https://daitodo.duckdns.org/tasklists
+### -----------------------------------------------
+
+
+### Filter task lists by name ---------------------
+GET https://daitodo.duckdns.org/tasklists?name=Urgent
+### -----------------------------------------------
+
+
+###### ====== PART 4: UPDATING RESOURCES ==========
+
+
+### Update task status from TODO to DOING ---------
+PUT https://daitodo.duckdns.org/tasks/1
+Content-Type: application/json
+
+{
+  "description": "Research API best practices",
+  "dueDate": "2026-01-25",
+  "priority": "HIGH",
+  "status": "DOING"
+}
+### -----------------------------------------------
+
+
+### Complete a task by updating status to DONE ----
+PUT https://daitodo.duckdns.org/tasks/1
+Content-Type: application/json
+
+{
+  "description": "Research API best practices",
+  "dueDate": "2026-01-25",
+  "priority": "HIGH",
+  "status": "DONE"
+}
+### -----------------------------------------------
+
+
+### Update a task list to add more tasks ----------
+PUT https://daitodo.duckdns.org/tasklists/1
+Content-Type: application/json
+
+{
+  "name": "Urgent Sprint Tasks - Updated",
+  "taskIds": [1, 2, 4]
+}
+### -----------------------------------------------
+
+
+###### ====== PART 5: HTTP CACHING DEMO ===========
+
+
+#### Step 1: Get a task with full response (note the Last-Modified header)
+GET https://daitodo.duckdns.org/tasks/1
+### ----------------------------------------------------------------------
+
+
+### Step 2: Request again with `If-Modified-Since` header ----------------
+# If not modified, returns 304 Not Modified
+GET https://daitodo.duckdns.org/tasks/1
+If-Modified-Since: Mon, 20 Jan 2026 15:30:00 GMT
+### ----------------------------------------------------------------------
+
+### Step 3: Conditional update with If-Unmodified-Since ------------------
+PUT https://daitodo.duckdns.org/tasks/1
+Content-Type: application/json
+If-Unmodified-Since: Mon, 20 Jan 2026 15:30:00 GMT
+
+{
+  "description": "Research API best practices - COMPLETE",
+  "dueDate": "2026-01-25",
+  "priority": "HIGH",
+  "status": "DONE"
+}
+### ----------------------------------------------------------------------
+
+
+###### ====== PART 6: CLEANUP ====================
+
+
+### Delete a task
+DELETE https://daitodo.duckdns.org/tasks/3
+
+### Delete a task list
+DELETE https://daitodo.duckdns.org/tasklists/1
+
+### Verify deletion of task
+GET https://daitodo.duckdns.org/tasks/3
+
+### Verify updated task list 2 after deliting a task within it
+GET https://daitodo.duckdns.org/tasklists/2

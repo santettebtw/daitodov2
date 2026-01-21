@@ -292,6 +292,12 @@ curl https://daitodo.duckdns.org/tasks?priority=HIGH
 curl https://daitodo.duckdns.org/tasks?dueDate=2026-01-25
 ```
 
+**Filter tasks with multiple criteria (AND logic):**
+
+```bash
+curl "https://daitodo.duckdns.org/tasks?status=TODO&priority=HIGH"
+```
+
 **Update a task:**
 
 ```bash
@@ -317,7 +323,7 @@ HTTP/1.1 204 No Content
 
 ```bash
 curl -X POST -H "Content-Type: application/json" \
-  -d '{"name":"Personal Projects","tasks":[]}' \
+  -d '{"name":"Personal Projects","taskIds":[1]}' \
   https://daitodo.duckdns.org/tasklists
 ```
 
@@ -327,6 +333,40 @@ Response:
   "id": 1,
   "name": "Personal Projects",
   "tasks": []
+}
+```
+
+**Create a task list with tasks:**
+
+```bash
+curl -X POST -H "Content-Type: application/json" \
+  -d '{"name":"Work Tasks","taskIds":[1,2]}' \
+  https://daitodo.duckdns.org/tasklists
+```
+
+Response:
+```json
+{
+  "id": 2,
+  "name": "Work Tasks",
+  "tasks": [
+    {
+      "id": 1,
+      "description": "Write project report",
+      "createdAt": "2026-01-20",
+      "dueDate": "2026-01-25",
+      "priority": "HIGH",
+      "status": "TODO"
+    },
+    {
+      "id": 2,
+      "description": "Review code",
+      "createdAt": "2026-01-20",
+      "dueDate": "2026-01-23",
+      "priority": "MEDIUM",
+      "status": "DOING"
+    }
+  ]
 }
 ```
 
@@ -352,7 +392,7 @@ curl https://daitodo.duckdns.org/tasklists?name=Personal
 
 ```bash
 curl -X PUT -H "Content-Type: application/json" \
-  -d '{"name":"Work Projects","tasks":[]}' \
+  -d '{"name":"Work Projects","taskIds":[1,3,5]}' \
   https://daitodo.duckdns.org/tasklists/1
 ```
 

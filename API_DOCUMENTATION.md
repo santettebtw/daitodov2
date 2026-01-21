@@ -215,7 +215,7 @@ Create a new task list.
 The request body must contain a JSON object with the following properties:
 
 - `name` (string) - The name of the task list
-- `tasks` (array) - An array of task objects (can be empty)
+- `taskIds` (array) - An array of task IDs (integers, can be empty)
 
 ##### Response
 
@@ -223,15 +223,14 @@ The response body contains a JSON object with the following properties:
 
 - `id` (integer) - The unique identifier of the task list (auto-generated)
 - `name` (string) - The name of the task list
-- `tasks` (array) - An array of task objects
+- `tasks` (array) - An array of task objects (resolved from the provided task IDs)
 
 The response includes a `Last-Modified` header with the creation timestamp.
 
 ##### Status codes
 
 - `201` (Created) - The task list has been successfully created
-- `400` (Bad Request) - The request body is invalid or missing required fields
-- `409` (Conflict) - A task list with the same name already exists
+- `400` (Bad Request) - The request body is invalid, missing required fields, or contains non-existent task IDs
 
 #### Get many task lists
 
@@ -299,7 +298,7 @@ The request path must contain the ID of the task list.
 The request body must contain a JSON object with the following properties:
 
 - `name` (string) - The name of the task list
-- `tasks` (array) - An array of task objects
+- `taskIds` (array) - An array of task IDs (integers)
 
 The request can include an `If-Unmodified-Since` header to prevent conflicts.
 
@@ -309,14 +308,14 @@ The response body contains a JSON object with the following properties:
 
 - `id` (integer) - The unique identifier of the task list
 - `name` (string) - The name of the task list
-- `tasks` (array) - An array of task objects
+- `tasks` (array) - An array of task objects (resolved from the provided task IDs)
 
 The response includes a `Last-Modified` header with the new modification timestamp.
 
 ##### Status codes
 
 - `200` (OK) - The task list has been successfully updated
-- `400` (Bad Request) - The request body is invalid
+- `400` (Bad Request) - The request body is invalid or contains non-existent task IDs
 - `404` (Not Found) - The task list does not exist
 - `412` (Precondition Failed) - The task list has been modified since `If-Unmodified-Since` timestamp
 
