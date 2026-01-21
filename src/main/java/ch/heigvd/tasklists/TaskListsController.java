@@ -1,5 +1,6 @@
 package ch.heigvd.tasklists;
 
+import ch.heigvd.tasks.Task;
 import io.javalin.http.*;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -9,6 +10,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class TaskListsController {
   private final ConcurrentMap<Integer, TaskList> lists;
+  private final ConcurrentMap<Integer, Task> tasks;
   private final AtomicInteger uniqueId;
   private final ConcurrentMap<Integer, LocalDateTime> taskListsCache;
 
@@ -16,18 +18,65 @@ public class TaskListsController {
 
   public TaskListsController(
       ConcurrentMap<Integer, TaskList> lists,
+      ConcurrentMap<Integer, Task> tasks,
       AtomicInteger uniqueId,
       ConcurrentMap<Integer, LocalDateTime> taskListsCache) {
     this.lists = lists;
+    this.tasks = tasks;
     this.uniqueId = uniqueId;
     this.taskListsCache = taskListsCache;
   }
 
-  public void create(Context ctx) {
-    TaskList newTaskList =
-        ctx.bodyValidator(TaskList.class).check(obj -> obj.name() != null, "Missing name").get();
+  private TaskListResponse toResponse(TaskList taskList) {
+    List<Task> resolvedTasks = new ArrayList<>();
+    if (taskList.taskIds() != null) {
+      for (Integer taskId : taskList.taskIds()) {
+        Task task = tasks.get(taskId);
+        if (task != null) {
+          resolvedTasks.add(task);
+        }
+      }
+    }
+    return new TaskListResponse(taskList.id(), taskList.name(), resolvedTasks);
+  }
 
-    newTaskList = new TaskList(uniqueId.getAndIncrement(), newTaskList.name(), newTaskList.tasks());
+  private void validateTaskIds(List<Integer> taskIds) {
+    if (taskIds != null) {
+      for (Integer taskId : taskIds) {
+        if (!tasks.containsKey(taskId)) {
+          throw new BadRequestResponse("Task with ID " + taskId + " does not exist");
+        }
+      }
+    }
+  }
+
+  /**
+   * Invalidate cache for task lists that contain the specified task ID. This should be called when
+   * a task is updated or deleted.
+   */
+  public void invalidateCacheForTask(Integer taskId) {
+    for (TaskList list : lists.values()) {
+      if (list.taskIds() != null && list.taskIds().contains(taskId)) {
+        taskListsCache.remove(list.id());
+      }
+    }
+    // also invalidate the "all task lists" cache
+    taskListsCache.remove(RESERVED_ID_TO_IDENTIFY_ALL_TASK_LISTS);
+  }
+
+  public void create(Context ctx) {
+    TaskListRequest request =
+        ctx.bodyValidator(TaskListRequest.class)
+            .check(obj -> obj.name() != null, "Missing name")
+            .get();
+
+    validateTaskIds(request.taskIds());
+
+    TaskList newTaskList =
+        new TaskList(
+            uniqueId.getAndIncrement(),
+            request.name(),
+            request.taskIds() != null ? new ArrayList<>(request.taskIds()) : new ArrayList<>());
 
     lists.put(newTaskList.id(), newTaskList);
 
@@ -40,7 +89,7 @@ public class TaskListsController {
 
     ctx.header("Last-Modified", String.valueOf(now));
 
-    ctx.json(newTaskList);
+    ctx.json(toResponse(newTaskList));
   }
 
   public void getOne(Context ctx) {
@@ -71,23 +120,26 @@ public class TaskListsController {
 
     ctx.header("Last-Modified", String.valueOf(now));
 
-    ctx.json(list);
+    ctx.json(toResponse(list));
   }
 
   public void getMany(Context ctx) {
     String name = ctx.queryParam("name");
 
-    List<TaskList> lists = new ArrayList<>();
+    List<TaskListResponse> responses = new ArrayList<>();
 
     for (TaskList list : this.lists.values()) {
-      if (name != null && !list.name().equalsIgnoreCase(name)) {
+      // check if list name contains it (case-insensitive)
+      if (name != null
+          && name.trim().length() > 0
+          && !list.name().toLowerCase().contains(name.toLowerCase().trim())) {
         continue;
       }
 
-      lists.add(list);
+      responses.add(toResponse(list));
     }
 
-    ctx.json(lists);
+    ctx.json(responses);
   }
 
   public void getAll(Context ctx) {
@@ -113,7 +165,12 @@ public class TaskListsController {
     // Add the last modification date to the response
     ctx.header("Last-Modified", String.valueOf(now));
 
-    ctx.json(lists);
+    List<TaskListResponse> responses = new ArrayList<>();
+    for (TaskList list : lists.values()) {
+      responses.add(toResponse(list));
+    }
+
+    ctx.json(responses);
   }
 
   public void update(Context ctx) {
@@ -132,19 +189,29 @@ public class TaskListsController {
       throw new PreconditionFailedResponse();
     }
 
-    TaskList updateTaskList =
-        ctx.bodyValidator(TaskList.class).check(obj -> obj.name() != null, "Missing name").get();
+    TaskListRequest request =
+        ctx.bodyValidator(TaskListRequest.class)
+            .check(obj -> obj.name() != null, "Missing name")
+            .get();
 
-    lists.put(id, updateTaskList);
+    validateTaskIds(request.taskIds());
+
+    TaskList updatedTaskList =
+        new TaskList(
+            id,
+            request.name(),
+            request.taskIds() != null ? new ArrayList<>(request.taskIds()) : new ArrayList<>());
+
+    lists.put(id, updatedTaskList);
 
     LocalDateTime now = LocalDateTime.now();
-    taskListsCache.put(updateTaskList.id(), now);
+    taskListsCache.put(updatedTaskList.id(), now);
 
     taskListsCache.remove(RESERVED_ID_TO_IDENTIFY_ALL_TASK_LISTS);
 
     ctx.header("Last-Modified", String.valueOf(now));
 
-    ctx.json(updateTaskList);
+    ctx.json(toResponse(updatedTaskList));
   }
 
   public void delete(Context ctx) {

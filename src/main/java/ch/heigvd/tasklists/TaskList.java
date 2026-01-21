@@ -1,5 +1,5 @@
 package ch.heigvd.tasklists;
 
-import ch.heigvd.tasks.Task;
+import java.util.List;
 
-public record TaskList(Integer id, String name, Task... tasks) {}
+public record TaskList(Integer id, String name, List<Integer> taskIds) {}

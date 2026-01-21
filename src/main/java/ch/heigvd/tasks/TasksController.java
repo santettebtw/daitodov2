@@ -1,5 +1,6 @@
 package ch.heigvd.tasks;
 
+import ch.heigvd.tasklists.TaskListsController;
 import io.javalin.http.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -12,6 +13,7 @@ public class TasksController {
   private final ConcurrentMap<Integer, Task> tasks;
   private final AtomicInteger nextTaskId;
   private final ConcurrentMap<Integer, LocalDateTime> tasksCache;
+  private TaskListsController taskListsController;
 
   // Magic number used to store the tasks list last modification date
   // As the ID for tasks starts from 1, it is safe to reserve the value -1 for all tasks
@@ -24,6 +26,11 @@ public class TasksController {
     this.tasks = tasks;
     this.nextTaskId = nextTaskId;
     this.tasksCache = tasksCache;
+  }
+
+  /** Set the task lists controller for cache invalidation. */
+  public void setTaskListsController(TaskListsController taskListsController) {
+    this.taskListsController = taskListsController;
   }
 
   public void create(Context ctx) {
@@ -89,22 +96,48 @@ public class TasksController {
 
   public void getMany(Context ctx) {
     String dueDate = ctx.queryParam("dueDate");
-    Task.Status status = Task.Status.valueOf(ctx.queryParam("status"));
-    Task.Priority priority = Task.Priority.valueOf(ctx.queryParam("priority"));
+    String statusParam = ctx.queryParam("status");
+    String priorityParam = ctx.queryParam("priority");
 
-    List<Task> tasks = new ArrayList<>();
+    Task.Status status = null;
+    Task.Priority priority = null;
 
-    for (Task task : this.tasks.values()) {
-      if (task.dueDate().toString().equals(dueDate)) {
-        tasks.add(task);
-      } else if (task.status().equals(status)) {
-        tasks.add(task);
-      } else if (task.priority().equals(priority)) {
-        tasks.add(task);
+    if (statusParam != null) {
+      try {
+        status = Task.Status.valueOf(statusParam.toUpperCase());
+      } catch (IllegalArgumentException e) {
+        throw new BadRequestResponse("Invalid status: " + statusParam);
       }
     }
 
-    ctx.json(tasks);
+    if (priorityParam != null) {
+      try {
+        priority = Task.Priority.valueOf(priorityParam.toUpperCase());
+      } catch (IllegalArgumentException e) {
+        throw new BadRequestResponse("Invalid priority: " + priorityParam);
+      }
+    }
+
+    List<Task> filteredTasks = new ArrayList<>();
+
+    // Apply filters with AND logic (all provided filters must match)
+    for (Task task : this.tasks.values()) {
+      boolean matches = true;
+      if (dueDate != null && !task.dueDate().toString().equals(dueDate)) {
+        matches = false;
+      }
+      if (status != null && !task.status().equals(status)) {
+        matches = false;
+      }
+      if (priority != null && !task.priority().equals(priority)) {
+        matches = false;
+      }
+      if (matches) {
+        filteredTasks.add(task);
+      }
+    }
+
+    ctx.json(filteredTasks);
   }
 
   public void getAll(Context ctx) {
@@ -169,6 +202,11 @@ public class TasksController {
 
     tasksCache.remove(RESERVED_ID_TO_IDENTIFY_ALL_TASKS);
 
+    // invalidate cache for task lists containing this task
+    if (taskListsController != null) {
+      taskListsController.invalidateCacheForTask(id);
+    }
+
     ctx.header("Last-Modified", String.valueOf(now));
 
     ctx.json(updatedTask);
@@ -193,8 +231,12 @@ public class TasksController {
     tasks.remove(id);
 
     tasksCache.remove(id);
-
     tasksCache.remove(RESERVED_ID_TO_IDENTIFY_ALL_TASKS);
+
+    // invalidate cache for task lists containing this task
+    if (taskListsController != null) {
+      taskListsController.invalidateCacheForTask(id);
+    }
 
     ctx.status(HttpStatus.NO_CONTENT);
   }

@@ -37,7 +37,10 @@ public class Main {
 
     TasksController tasksController = new TasksController(tasks, nextTaskId, tasksCache);
     TaskListsController taskListsController =
-        new TaskListsController(taskLists, nextTaskListId, taskListsCache);
+        new TaskListsController(taskLists, tasks, nextTaskListId, taskListsCache);
+
+    // link controllers for cache invalidation
+    tasksController.setTaskListsController(taskListsController);
 
     Javalin app =
         Javalin.create(
@@ -52,13 +55,13 @@ public class Main {
               config.jsonMapper(new JavalinJackson(mapper, false));
             });
 
-    app.get("/tasks", tasksController::getAll);
+    app.get("/tasks", tasksController::getMany);
     app.get("/tasks/{id}", tasksController::getOne);
     app.post("/tasks", tasksController::create);
     app.put("/tasks/{id}", tasksController::update);
     app.delete("/tasks/{id}", tasksController::delete);
 
-    app.get("/tasklists", taskListsController::getAll);
+    app.get("/tasklists", taskListsController::getMany);
     app.get("/tasklists/{id}", taskListsController::getOne);
     app.post("/tasklists", taskListsController::create);
     app.put("/tasklists/{id}", taskListsController::update);
